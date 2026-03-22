@@ -282,11 +282,3 @@ Current verified scenario is a local multi-process setup on one machine:
 - transaction propagation through `/inv`
 
 The current implementation stores peers, blocks and transactions in memory only.
-
-## Limitations
-
-- no persistent storage yet
-- no transaction-to-block assembly
-- no block validation or consensus
-- no automated load-testing tool yet
-- peer discovery and propagation are aimed at a simple educational P2P prototype, not production use
