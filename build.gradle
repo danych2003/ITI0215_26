@@ -1,0 +1,45 @@
+plugins {
+    id 'java'
+}
+
+group = 'ee.danych'
+version = '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation("tools.jackson.core:jackson-databind:3.1.0")
+    implementation("org.slf4j:slf4j-api:2.0.17")
+    runtimeOnly("org.slf4j:slf4j-simple:2.0.17")
+    compileOnly("org.projectlombok:lombok:1.18.44")
+    annotationProcessor("org.projectlombok:lombok:1.18.44")
+
+    testImplementation platform('org.junit:junit-bom:5.10.0')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testCompileOnly("org.projectlombok:lombok:1.18.44")
+    testAnnotationProcessor("org.projectlombok:lombok:1.18.44")
+}
+
+test {
+    useJUnitPlatform()
+}
+
+tasks.register('runNode8081', JavaExec) {
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'NodeApp'
+    args = ['8081']
+}
+
+tasks.register('runNode8082', JavaExec) {
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'NodeApp'
+    args = ['8082']
+}
+
+tasks.register('runNode8083', JavaExec) {
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'NodeApp'
+    args = ['8083']
+}
