@@ -61,14 +61,19 @@ Each node:
 
 ## Protocol
 
-### `GET /test`
+### `GET /status`
 
-Health-check endpoint.
+Returns the current node state.
 
 Response:
 
-```text
-OK
+```json
+{
+  "selfAddress": "localhost:8081",
+  "peersCount": 3,
+  "blocksCount": 1,
+  "transactionsCount": 2
+}
 ```
 
 ### `GET /addr`
@@ -214,11 +219,14 @@ Possible error responses:
 
 ### 2. Check discovery
 
+- `GET http://localhost:8081/status`
+- `GET http://localhost:8082/status`
+- `GET http://localhost:8083/status`
 - `GET http://localhost:8081/addr`
 - `GET http://localhost:8082/addr`
 - `GET http://localhost:8083/addr`
 
-Expected result: each node returns the known local peers.
+Expected result: each node returns its own status and the known local peers.
 
 ### 3. Send a transaction
 
