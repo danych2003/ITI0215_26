@@ -14,6 +14,15 @@ public class HttpRequestHelper {
         return false;
     }
 
+    public static boolean rejectNonPost(HttpExchange exchange) throws IOException {
+        if (!"Post".equalsIgnoreCase(exchange.getRequestMethod())) {
+            HttpResponseWriter.writeText(exchange, 405, "Method Not Allowed");
+            return true;
+        }
+
+        return false;
+    }
+
     public static String extractPathValue(HttpExchange exchange, String pathPrefix, String missingValueMessage)
             throws IOException {
         String path = exchange.getRequestURI().getPath();

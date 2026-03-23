@@ -11,10 +11,13 @@ import java.net.HttpURLConnection;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -23,12 +26,12 @@ public class PeerDiscoveryService {
 
     private final ObjectMapper objectMapper;
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+    private final Map<String, String> peerFailures = new ConcurrentHashMap<>();
 
     public void startDiscovery(PeerStore peerStore, String selfAddress) {
-        runDiscovery(peerStore, selfAddress);
         scheduler.scheduleWithFixedDelay(
                 () -> runDiscovery(peerStore, selfAddress),
-                DISCOVERY_INTERVAL_SECONDS,
+                0,
                 DISCOVERY_INTERVAL_SECONDS,
                 TimeUnit.SECONDS
         );
@@ -39,7 +42,7 @@ public class PeerDiscoveryService {
     }
 
     private void runDiscovery(PeerStore peerStore, String selfAddress) {
-        Set<String> knownPeers = peerStore.getAllPeers();
+        Set<String> knownPeers = new HashSet<>(peerStore.getAllPeers());
 
         for (String peer : knownPeers) {
             if (peer.equals(selfAddress)) {
@@ -48,18 +51,16 @@ public class PeerDiscoveryService {
 
             try {
                 Set<String> discoveredPeers = fetchPeers(peer);
-                Set<String> peersBeforeUpdate = peerStore.getAllPeers();
-                peerStore.addPeers(discoveredPeers);
-                Set<String> newPeers = peerStore.getAllPeers();
-                newPeers.removeAll(peersBeforeUpdate);
+                Set<String> newPeers = peerStore.addPeers(discoveredPeers);
+                logPeerRecovered(peer);
 
                 if (!newPeers.isEmpty()) {
                     log.info("Discovered new peers from {}: {}", peer, newPeers);
                 } else {
                     log.debug("No new peers discovered from {}", peer);
                 }
-            } catch (IOException e) {
-                log.warn("Peer unavailable: {} ({})", peer, e.getMessage());
+            } catch (Exception e) {
+                logPeerFailure(peer, e);
                 log.debug("Peer discovery failed for {}", peer, e);
             }
         }
@@ -78,9 +79,44 @@ public class PeerDiscoveryService {
         }
 
         try (InputStream inputStream = connection.getInputStream()) {
-            return new HashSet<>(Arrays.asList(objectMapper.readValue(inputStream, String[].class)));
+            return Arrays.stream(objectMapper.readValue(inputStream, String[].class))
+                    .filter(this::isValidPeer)
+                    .collect(Collectors.toSet());
         } finally {
             connection.disconnect();
+        }
+    }
+
+    private boolean isValidPeer(String peer) {
+        try {
+            URI uri = URI.create("http://" + peer);
+            return uri.getHost() != null
+                    && uri.getPort() >= 1
+                    && uri.getPort() <= 65535
+                    && uri.getPath().isEmpty()
+                    && uri.getQuery() == null
+                    && uri.getFragment() == null
+                    && uri.getUserInfo() == null;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private void logPeerFailure(String peer, Exception exception) {
+        String failureReason = exception.getMessage() == null ? exception.getClass().getSimpleName() : exception.getMessage();
+        String previousFailureReason = peerFailures.put(peer, failureReason);
+
+        if (!failureReason.equals(previousFailureReason)) {
+            log.warn("Peer discovery failed for {} ({})", peer, failureReason);
+            return;
+        }
+
+        log.debug("Peer {} is still unavailable ({})", peer, failureReason);
+    }
+
+    private void logPeerRecovered(String peer) {
+        if (peerFailures.remove(peer) != null) {
+            log.info("Peer {} is reachable again", peer);
         }
     }
 }

@@ -40,7 +40,7 @@ public class NodeApp {
                 transactionStore,
                 objectMapper
         ));
-        server.createContext("/addr", new AddrHandler(peerStore, objectMapper));
+        server.createContext("/addr", new GetAddrHandler(peerStore, objectMapper));
         server.createContext("/getblocks", new GetBlocksHandler(blockStore, objectMapper));
         server.createContext("/getblocks/", new GetBlocksAfterHandler(blockStore, objectMapper));
         server.createContext("/getdata/", new GetDataHandler(blockStore, objectMapper));

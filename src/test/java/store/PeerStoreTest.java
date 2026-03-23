@@ -24,9 +24,10 @@ class PeerStoreTest {
     void addPeersAddsOnlyUniquePeers() {
         PeerStore peerStore = new PeerStore(List.of("localhost:8081"));
 
-        peerStore.addPeers(List.of("localhost:8081", "localhost:8082", "localhost:8083"));
+        Set<String> addedPeers = peerStore.addPeers(List.of("localhost:8081", "localhost:8082", "localhost:8083"));
 
         assertEquals(3, peerStore.size());
+        assertEquals(Set.of("localhost:8082", "localhost:8083"), addedPeers);
         assertEquals(
                 Set.of("localhost:8081", "localhost:8082", "localhost:8083"),
                 peerStore.getAllPeers()

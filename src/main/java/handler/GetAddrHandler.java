@@ -9,7 +9,7 @@ import tools.jackson.databind.ObjectMapper;
 import java.io.IOException;
 
 @RequiredArgsConstructor
-public class AddrHandler implements HttpHandler {
+public class GetAddrHandler implements HttpHandler {
     private final PeerStore peerStore;
     private final ObjectMapper objectMapper;
 

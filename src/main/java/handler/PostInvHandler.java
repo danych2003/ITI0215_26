@@ -23,8 +23,7 @@ public class PostInvHandler implements HttpHandler {
 
     @Override
     public void handle(HttpExchange exchange) throws IOException {
-        if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
-            HttpResponseWriter.writeText(exchange, 405, "Method Not Allowed");
+        if (HttpRequestHelper.rejectNonPost(exchange)) {
             return;
         }
 
