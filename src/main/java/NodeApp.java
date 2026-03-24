@@ -2,6 +2,7 @@ import com.sun.net.httpserver.HttpServer;
 import handler.*;
 import lombok.extern.slf4j.Slf4j;
 import service.BlockBroadcastService;
+import service.BlockPullSyncService;
 import service.PeerDiscoveryService;
 import service.PeerHttpClient;
 import service.TransactionBroadcastService;
@@ -57,7 +58,16 @@ public class NodeApp {
         PeerDiscoveryService peerDiscoveryService = new PeerDiscoveryService(objectMapper);
         peerDiscoveryService.startDiscovery(peerStore, selfAddress);
 
+        BlockPullSyncService blockPullSyncService = new BlockPullSyncService(
+                peerStore,
+                blockStore,
+                peerHttpClient,
+                selfAddress
+        );
+        blockPullSyncService.start();
+
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            blockPullSyncService.shutdown();
             peerDiscoveryService.shutdown();
             server.stop(0);
         }));
