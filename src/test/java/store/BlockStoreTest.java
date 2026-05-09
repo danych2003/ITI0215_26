@@ -2,7 +2,10 @@ package store;
 
 import model.Block;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import tools.jackson.databind.ObjectMapper;
 
+import java.nio.file.Path;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -12,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BlockStoreTest {
     @Test
-    void addBlockRejectsDuplicateHashes() {
+    void addBlockRejectsDuplicateHashes() throws Exception {
         BlockStore blockStore = new BlockStore();
         Block block = Block.fromData("block-1");
 
@@ -22,7 +25,7 @@ class BlockStoreTest {
     }
 
     @Test
-    void getBlockReturnsStoredBlock() {
+    void getBlockReturnsStoredBlock() throws Exception {
         BlockStore blockStore = new BlockStore();
         Block block = Block.fromData("block-1");
         blockStore.addBlock(block);
@@ -31,7 +34,7 @@ class BlockStoreTest {
     }
 
     @Test
-    void getAllHashesReturnsInsertionOrder() {
+    void getAllHashesReturnsInsertionOrder() throws Exception {
         BlockStore blockStore = new BlockStore();
         Block first = Block.fromData("block-1");
         Block second = Block.fromData("block-2");
@@ -48,7 +51,7 @@ class BlockStoreTest {
     }
 
     @Test
-    void getHashesAfterReturnsOnlyHashesThatFollowKnownHash() {
+    void getHashesAfterReturnsOnlyHashesThatFollowKnownHash() throws Exception {
         BlockStore blockStore = new BlockStore();
         Block first = Block.fromData("block-1");
         Block second = Block.fromData("block-2");
@@ -65,10 +68,29 @@ class BlockStoreTest {
     }
 
     @Test
-    void getHashesAfterReturnsEmptyListForUnknownHash() {
+    void getHashesAfterReturnsEmptyListForUnknownHash() throws Exception {
         BlockStore blockStore = new BlockStore();
         blockStore.addBlock(Block.fromData("block-1"));
 
         assertEquals(List.of(), blockStore.getHashesAfter("missing"));
+    }
+
+    @Test
+    void persistentStoreLoadsBlocksFromDisk(@TempDir Path tempDir) throws Exception {
+        Path storageFile = tempDir.resolve("blocks.json");
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        Block first = Block.fromData("block-1");
+        Block second = Block.fromData("block-2");
+
+        BlockStore firstStore = new BlockStore(storageFile, objectMapper);
+        firstStore.addBlock(first);
+        firstStore.addBlock(second);
+
+        BlockStore secondStore = new BlockStore(storageFile, objectMapper);
+
+        assertEquals(List.of(first.getHash(), second.getHash()), secondStore.getAllHashes());
+        assertEquals(first.getData(), secondStore.getBlock(first.getHash()).getData());
+        assertEquals(second.getData(), secondStore.getBlock(second.getHash()).getData());
     }
 }

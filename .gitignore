@@ -2,3 +2,5 @@
 /.gradle/
 /out/
 /build/
+/tasks/
+/data/

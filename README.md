@@ -34,6 +34,19 @@ or:
 
 To start all three local nodes at once, see [RUN_NODES.md](/C:/Users/Acer0/IdeaProjects/peer-ledger/RUN_NODES.md).
 
+To run a node with an explicit host or LAN IP:
+
+```powershell
+.\gradlew.bat classes
+java -cp build\classes\java\main;build\resources\main;build\libs\* NodeApp 8081 192.168.0.15 C:\path\to\peers.json
+```
+
+Arguments:
+
+- `8081` - local listening port
+- `192.168.0.15` - host/IP to bind and advertise to peers
+- `C:\path\to\peers.json` - peer bootstrap file for this machine or network
+
 Bootstrap peers are configured in [peers.json](/C:/Users/Acer0/IdeaProjects/peer-ledger/src/main/resources/peers.json):
 
 ```json
@@ -43,6 +56,8 @@ Bootstrap peers are configured in [peers.json](/C:/Users/Acer0/IdeaProjects/peer
   "localhost:8083"
 ]
 ```
+
+Persisted blocks are stored per node under `data/node-<port>/blocks.json`.
 
 ## Network Topology
 
@@ -281,4 +296,28 @@ Current verified scenario is a local multi-process setup on one machine:
 - block propagation through `/block`
 - transaction propagation through `/inv`
 
-The current implementation stores peers, blocks and transactions in memory only.
+Peers and transactions are stored in memory. Blocks are persisted on disk per node and reloaded on restart.
+
+The node no longer assumes `localhost` internally: a node can be started with a real host/IP so the same protocol can be exercised across multiple machines, as long as peers use reachable addresses in `peers.json`.
+
+### Simulation Results
+
+Use:
+
+```powershell
+.\gradlew.bat runSimulation
+```
+
+The simulation writes reports to `build/simulation/reports/` and per-node logs to `build/simulation/logs/`.
+
+Latest verified local run:
+
+- propagation scenario: `PASS` on `3` nodes
+- failure recovery scenario: `PASS` on `3` nodes
+- scale scenario: `PASS` on `5`, `10`, and `20` nodes
+- scale scenario: `FAIL` on `30` nodes with `Address already in use: getsockopt`
+
+Observed current local limit on this machine:
+
+- the implementation remains stable up to `20` concurrently simulated nodes in the built-in scale run
+- at `30` nodes, the local machine runs into socket/resource exhaustion during the simulation run and at least one node fails to become reachable

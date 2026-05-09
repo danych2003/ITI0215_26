@@ -9,7 +9,7 @@ import java.util.List;
 public class TransactionStore {
     private final LinkedHashMap<String, Transaction> transactionsByHash = new LinkedHashMap<>();
 
-    public boolean addTransaction(Transaction transaction) {
+    public synchronized boolean addTransaction(Transaction transaction) {
         if (transactionsByHash.containsKey(transaction.getHash())) {
             return false;
         }
@@ -18,15 +18,15 @@ public class TransactionStore {
         return true;
     }
 
-    public Transaction getTransaction(String hash) {
+    public synchronized Transaction getTransaction(String hash) {
         return transactionsByHash.get(hash);
     }
 
-    public List<String> getAllHashes() {
+    public synchronized List<String> getAllHashes() {
         return new ArrayList<>(transactionsByHash.keySet());
     }
 
-    public int size() {
+    public synchronized int size() {
         return transactionsByHash.size();
     }
 }

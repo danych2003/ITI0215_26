@@ -44,3 +44,8 @@ tasks.register('runNode8083', JavaExec) {
     mainClass = 'NodeApp'
     args = ['8083']
 }
+
+tasks.register('runSimulation', JavaExec) {
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'simulation.NetworkSimulationApp'
+}

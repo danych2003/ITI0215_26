@@ -12,7 +12,6 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -48,6 +47,6 @@ public class PostInvHandler implements HttpHandler {
         );
         HttpResponseWriter.writeJson(exchange, 200, objectMapper.writeValueAsBytes(response));
 
-        CompletableFuture.runAsync(() -> transactionBroadcastService.broadcast(transaction.getData()));
+        transactionBroadcastService.submitBroadcast(transaction.getData());
     }
 }
