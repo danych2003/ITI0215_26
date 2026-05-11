@@ -44,8 +44,16 @@ public class TransactionBroadcastService extends AbstractPeerBroadcastService {
     }
 
     @Override
-    protected Object requestBody(String data) {
-        return new CreateTransactionRequest(data);
+    protected Object requestBody(Object requestBody) {
+        if (requestBody instanceof CreateTransactionRequest createTransactionRequest) {
+            return createTransactionRequest;
+        }
+
+        if (requestBody instanceof String data) {
+            return new CreateTransactionRequest(data, null, null);
+        }
+
+        throw new IllegalArgumentException("Unsupported transaction broadcast body: " + requestBody);
     }
 
     @Override

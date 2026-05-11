@@ -1,16 +1,24 @@
 package config;
 
+import java.math.BigDecimal;
+
 public record NodeConfig(
         int port,
         String host,
         String peersConfigPath,
         boolean backgroundServicesEnabled,
-        int broadcastFanOut
+        int broadcastFanOut,
+        int miningDifficulty,
+        long miningIntervalMillis,
+        BigDecimal miningReward
 ) {
     private static final String DEFAULT_HOST = "localhost";
     private static final String DEFAULT_PEERS_CONFIG_PATH = "peers.json";
     private static final boolean DEFAULT_BACKGROUND_SERVICES_ENABLED = true;
     private static final int DEFAULT_BROADCAST_FAN_OUT = 0;
+    private static final int DEFAULT_MINING_DIFFICULTY = 0;
+    private static final long DEFAULT_MINING_INTERVAL_MILLIS = 2_000L;
+    private static final BigDecimal DEFAULT_MINING_REWARD = BigDecimal.ONE;
 
     public static NodeConfig fromArgs(String[] args) {
         if (args.length == 0) {
@@ -26,8 +34,26 @@ public record NodeConfig(
         int broadcastFanOut = args.length >= 5
                 ? parseBroadcastFanOut(args[4])
                 : DEFAULT_BROADCAST_FAN_OUT;
+        int miningDifficulty = args.length >= 6
+                ? parseMiningDifficulty(args[5])
+                : DEFAULT_MINING_DIFFICULTY;
+        long miningIntervalMillis = args.length >= 7
+                ? parseMiningIntervalMillis(args[6])
+                : DEFAULT_MINING_INTERVAL_MILLIS;
+        BigDecimal miningReward = args.length >= 8
+                ? parseMiningReward(args[7])
+                : DEFAULT_MINING_REWARD;
 
-        return new NodeConfig(port, host, peersConfigPath, backgroundServicesEnabled, broadcastFanOut);
+        return new NodeConfig(
+                port,
+                host,
+                peersConfigPath,
+                backgroundServicesEnabled,
+                broadcastFanOut,
+                miningDifficulty,
+                miningIntervalMillis,
+                miningReward
+        );
     }
 
     public String selfAddress() {
@@ -75,6 +101,42 @@ public record NodeConfig(
             return Integer.parseInt(rawValue);
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException("Broadcast fan-out must be a number", e);
+        }
+    }
+
+    private static int parseMiningDifficulty(String rawValue) {
+        try {
+            int difficulty = Integer.parseInt(rawValue);
+            if (difficulty < 0) {
+                throw new IllegalArgumentException("Mining difficulty must not be negative");
+            }
+            return difficulty;
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Mining difficulty must be a number", e);
+        }
+    }
+
+    private static long parseMiningIntervalMillis(String rawValue) {
+        try {
+            long intervalMillis = Long.parseLong(rawValue);
+            if (intervalMillis <= 0) {
+                throw new IllegalArgumentException("Mining interval must be positive");
+            }
+            return intervalMillis;
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Mining interval must be a number", e);
+        }
+    }
+
+    private static BigDecimal parseMiningReward(String rawValue) {
+        try {
+            BigDecimal reward = new BigDecimal(rawValue);
+            if (reward.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new IllegalArgumentException("Mining reward must be positive");
+            }
+            return reward;
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Mining reward must be a decimal number", e);
         }
     }
 }

@@ -6,13 +6,19 @@ import config.PeerConfigLoader;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import model.NodeKeyMaterial;
 import service.BlockBroadcastService;
+import service.BlockMiningService;
 import service.BlockPullSyncService;
+import service.LedgerStateService;
+import service.NodeKeyPairStore;
 import service.PeerDiscoveryService;
 import service.PeerHttpClient;
 import service.TransactionPullSyncService;
 import service.TransactionBroadcastService;
+import service.TransactionValidationService;
 import store.BlockStore;
+import store.CanonicalChainStore;
 import store.PeerStore;
 import store.TransactionStore;
 import tools.jackson.databind.ObjectMapper;
@@ -43,6 +49,13 @@ public final class NodeRuntime {
         PeerStore peerStore = new PeerStore(peerConfigLoader.loadPeers());
         BlockStore blockStore = new BlockStore(blockStoragePath(config), objectMapper);
         TransactionStore transactionStore = new TransactionStore();
+        CanonicalChainStore canonicalChainStore = new CanonicalChainStore(
+                config.miningDifficulty(),
+                config.miningReward()
+        );
+        LedgerStateService ledgerStateService =
+                new LedgerStateService(blockStore, transactionStore, canonicalChainStore, objectMapper);
+        NodeKeyMaterial nodeKeyMaterial = new NodeKeyPairStore(nodeKeysPath(config), objectMapper).loadOrCreate();
         PeerHttpClient peerHttpClient = new PeerHttpClient(objectMapper);
         ExecutorService broadcastExecutor = createBroadcastExecutor();
 
@@ -66,7 +79,7 @@ public final class NodeRuntime {
         PeerDiscoveryService peerDiscoveryService = new PeerDiscoveryService(objectMapper);
         BlockPullSyncService blockPullSyncService = new BlockPullSyncService(
                 peerStore,
-                blockStore,
+                ledgerStateService,
                 peerHttpClient,
                 selfAddress
         );
@@ -76,16 +89,31 @@ public final class NodeRuntime {
                 peerHttpClient,
                 selfAddress
         );
+        TransactionValidationService transactionValidationService =
+                new TransactionValidationService(transactionStore, ledgerStateService, objectMapper);
+        BlockMiningService blockMiningService = new BlockMiningService(
+                transactionStore::getAllTransactions,
+                ledgerStateService,
+                blockBroadcastService,
+                nodeKeyMaterial,
+                objectMapper,
+                config.miningDifficulty(),
+                config.miningIntervalMillis(),
+                config.miningReward()
+        );
 
         NodeHttpServerFactory serverFactory = new NodeHttpServerFactory();
         HttpServer server = serverFactory.create(
                 config,
                 selfAddress,
                 peerStore,
-                blockStore,
+                ledgerStateService,
                 transactionStore,
                 blockBroadcastService,
                 transactionBroadcastService,
+                transactionValidationService,
+                config.miningDifficulty(),
+                config.miningReward(),
                 objectMapper
         );
 
@@ -95,15 +123,22 @@ public final class NodeRuntime {
                 peerDiscoveryService,
                 blockPullSyncService,
                 transactionPullSyncService,
+                blockMiningService,
                 broadcastExecutor,
                 config.backgroundServicesEnabled()
         );
+
+        log.info("Node public key: {}", nodeKeyMaterial.publicKeyEncoded());
 
         return new NodeRuntime(config, lifecycle, server);
     }
 
     private static Path blockStoragePath(NodeConfig config) {
         return Path.of("data", "node-" + config.port(), "blocks.json");
+    }
+
+    private static Path nodeKeysPath(NodeConfig config) {
+        return Path.of("data", "node-" + config.port(), "keys.json");
     }
 
     private static ExecutorService createBroadcastExecutor() {

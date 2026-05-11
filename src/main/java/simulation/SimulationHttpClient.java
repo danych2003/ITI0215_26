@@ -42,6 +42,10 @@ public final class SimulationHttpClient {
         postJson(address, "/block", "{\"data\":\"" + escapeJson(data) + "\"}");
     }
 
+    public void postStructuredBlock(String address, String requestBody) throws IOException {
+        postJson(address, "/block", requestBody);
+    }
+
     private List<String> getTextArray(String address, String path) throws IOException {
         JsonNode response = getJson(address, path);
         List<String> values = new ArrayList<>();

@@ -46,6 +46,10 @@ public class BlockStore {
         return new ArrayList<>(blocksByHash.keySet());
     }
 
+    public synchronized List<Block> getAllBlocks() {
+        return new ArrayList<>(blocksByHash.values());
+    }
+
     public synchronized List<String> getHashesAfter(String hash) {
         List<String> hashes = getAllHashes();
         int index = hashes.indexOf(hash);

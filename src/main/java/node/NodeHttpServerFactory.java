@@ -12,13 +12,15 @@ import handler.PostBlockHandler;
 import handler.PostInvHandler;
 import handler.StatusHandler;
 import service.BlockBroadcastService;
+import service.LedgerStateService;
+import service.TransactionValidationService;
 import service.TransactionBroadcastService;
-import store.BlockStore;
 import store.PeerStore;
 import store.TransactionStore;
 import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.net.InetSocketAddress;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -31,28 +33,42 @@ public final class NodeHttpServerFactory {
             NodeConfig config,
             String selfAddress,
             PeerStore peerStore,
-            BlockStore blockStore,
+            LedgerStateService ledgerStateService,
             TransactionStore transactionStore,
             BlockBroadcastService blockBroadcastService,
             TransactionBroadcastService transactionBroadcastService,
+            TransactionValidationService transactionValidationService,
+            int miningDifficulty,
+            BigDecimal miningReward,
             ObjectMapper objectMapper
     ) throws IOException {
         HttpServer server = HttpServer.create(createListenAddress(config), 0);
         server.createContext("/status", new StatusHandler(
                 selfAddress,
                 peerStore,
-                blockStore,
+                ledgerStateService,
                 transactionStore,
                 objectMapper
         ));
         server.createContext("/addr", new GetAddrHandler(peerStore, objectMapper));
-        server.createContext("/getblocks", new GetBlocksHandler(blockStore, objectMapper));
-        server.createContext("/getblocks/", new GetBlocksAfterHandler(blockStore, objectMapper));
-        server.createContext("/getdata/", new GetDataHandler(blockStore, objectMapper));
+        server.createContext("/getblocks", new GetBlocksHandler(ledgerStateService, objectMapper));
+        server.createContext("/getblocks/", new GetBlocksAfterHandler(ledgerStateService, objectMapper));
+        server.createContext("/getdata/", new GetDataHandler(ledgerStateService, objectMapper));
         server.createContext("/transactions", new GetTransactionsHandler(transactionStore, objectMapper));
         server.createContext("/transactions/", new GetTransactionDataHandler(transactionStore, objectMapper));
-        server.createContext("/block", new PostBlockHandler(blockStore, blockBroadcastService, objectMapper));
-        server.createContext("/inv", new PostInvHandler(transactionStore, transactionBroadcastService, objectMapper));
+        server.createContext("/block", new PostBlockHandler(
+                ledgerStateService,
+                blockBroadcastService,
+                objectMapper,
+                miningDifficulty,
+                miningReward
+        ));
+        server.createContext("/inv", new PostInvHandler(
+                transactionStore,
+                transactionBroadcastService,
+                transactionValidationService,
+                objectMapper
+        ));
         server.setExecutor(createServerExecutor());
         return server;
     }

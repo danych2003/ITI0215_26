@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import model.Transaction;
 import model.request.CreateTransactionRequest;
 import service.TransactionBroadcastService;
+import service.TransactionValidationService;
 import store.TransactionStore;
 import tools.jackson.databind.ObjectMapper;
 
@@ -18,6 +19,7 @@ import java.util.Map;
 public class PostInvHandler implements HttpHandler {
     private final TransactionStore transactionStore;
     private final TransactionBroadcastService transactionBroadcastService;
+    private final TransactionValidationService transactionValidationService;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -26,27 +28,62 @@ public class PostInvHandler implements HttpHandler {
             return;
         }
 
-        CreateTransactionRequest request = objectMapper.readValue(exchange.getRequestBody(), CreateTransactionRequest.class);
-        if (request.data() == null || request.data().isBlank()) {
-            HttpResponseWriter.writeText(exchange, 400, "Transaction data is required");
-            return;
+        try {
+            CreateTransactionRequest request = objectMapper.readValue(exchange.getRequestBody(), CreateTransactionRequest.class);
+            Transaction transaction = toStoredTransaction(request);
+            if (transaction == null) {
+                HttpResponseWriter.writeText(exchange, 400, "Transaction data is required");
+                return;
+            }
+            boolean transactionAdded = transactionStore.addTransaction(transaction);
+
+            if (!transactionAdded) {
+                HttpResponseWriter.writeText(exchange, 409, "Transaction already exists");
+                return;
+            }
+
+            log.info("Accepted transaction {}", transaction.getHash());
+            Map<String, Object> response = Map.of(
+                    "accepted", true,
+                    "hash", transaction.getHash()
+            );
+            HttpResponseWriter.writeJson(exchange, 200, objectMapper.writeValueAsBytes(response));
+
+            transactionBroadcastService.submitBroadcast(toBroadcastRequest(request, transaction));
+        } catch (InvalidTransactionException e) {
+            HttpResponseWriter.writeText(exchange, e.statusCode, e.getMessage());
+        }
+    }
+
+    private Transaction toStoredTransaction(CreateTransactionRequest request) {
+        if (request.data() != null && !request.data().isBlank()) {
+            return Transaction.fromData(request.data());
         }
 
-        Transaction transaction = Transaction.fromData(request.data());
-        boolean transactionAdded = transactionStore.addTransaction(transaction);
+        if (request.transaction() != null) {
+            TransactionValidationService.ValidationResult validationResult = transactionValidationService.validate(request);
+            if (!validationResult.accepted()) {
+                throw new InvalidTransactionException(validationResult.statusCode(), validationResult.message());
+            }
+            return validationResult.storedTransaction();
+        }
+        return null;
+    }
 
-        if (!transactionAdded) {
-            HttpResponseWriter.writeText(exchange, 409, "Transaction already exists");
-            return;
+    private CreateTransactionRequest toBroadcastRequest(CreateTransactionRequest request, Transaction transaction) {
+        if (request.transaction() != null) {
+            return new CreateTransactionRequest(null, request.signature(), request.transaction());
         }
 
-        log.info("Accepted transaction {}", transaction.getHash());
-        Map<String, Object> response = Map.of(
-                "accepted", true,
-                "hash", transaction.getHash()
-        );
-        HttpResponseWriter.writeJson(exchange, 200, objectMapper.writeValueAsBytes(response));
+        return new CreateTransactionRequest(transaction.getData(), null, null);
+    }
 
-        transactionBroadcastService.submitBroadcast(transaction.getData());
+    private static final class InvalidTransactionException extends RuntimeException {
+        private final int statusCode;
+
+        private InvalidTransactionException(int statusCode, String message) {
+            super(message);
+            this.statusCode = statusCode;
+        }
     }
 }

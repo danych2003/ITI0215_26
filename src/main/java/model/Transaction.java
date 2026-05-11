@@ -17,4 +17,13 @@ public class Transaction {
     public static Transaction fromData(String data) {
         return new Transaction(HashUtils.sha256Hex(data), data);
     }
+
+    public static Transaction fromHashAndData(String hash, String data) {
+        String calculatedHash = HashUtils.sha256Hex(data);
+        if (!calculatedHash.equals(hash)) {
+            throw new IllegalArgumentException("Transaction hash does not match transaction data");
+        }
+
+        return new Transaction(hash, data);
+    }
 }

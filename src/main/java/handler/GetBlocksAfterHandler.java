@@ -3,7 +3,7 @@ package handler;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import lombok.RequiredArgsConstructor;
-import store.BlockStore;
+import service.LedgerStateService;
 import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
@@ -12,7 +12,7 @@ import java.io.IOException;
 public class GetBlocksAfterHandler implements HttpHandler {
     private static final String PATH_PREFIX = "/getblocks/";
 
-    private final BlockStore blockStore;
+    private final LedgerStateService ledgerStateService;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -25,7 +25,7 @@ public class GetBlocksAfterHandler implements HttpHandler {
         if (hash == null) {
             return;
         }
-        byte[] response = objectMapper.writeValueAsBytes(blockStore.getHashesAfter(hash));
+        byte[] response = objectMapper.writeValueAsBytes(ledgerStateService.getCanonicalHashesAfter(hash));
         HttpResponseWriter.writeJson(exchange, 200, response);
     }
 }

@@ -4,7 +4,7 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import lombok.RequiredArgsConstructor;
 import model.Block;
-import store.BlockStore;
+import service.LedgerStateService;
 import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
@@ -13,7 +13,7 @@ import java.io.IOException;
 public class GetDataHandler implements HttpHandler {
     private static final String PATH_PREFIX = "/getdata/";
 
-    private final BlockStore blockStore;
+    private final LedgerStateService ledgerStateService;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -26,7 +26,7 @@ public class GetDataHandler implements HttpHandler {
         if (hash == null) {
             return;
         }
-        Block block = blockStore.getBlock(hash);
+        Block block = ledgerStateService.getKnownBlock(hash);
         if (block == null) {
             HttpResponseWriter.writeText(exchange, 404, "Block not found");
             return;

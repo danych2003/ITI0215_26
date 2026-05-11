@@ -7,7 +7,9 @@ import model.Block;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import store.BlockStore;
+import store.CanonicalChainStore;
 import store.PeerStore;
+import store.TransactionStore;
 import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
@@ -48,10 +50,13 @@ class BlockPullSyncServiceTest {
         String peer = "localhost:" + server.getAddress().getPort();
         BlockStore blockStore = new BlockStore();
         blockStore.addBlock(first);
+        LedgerStateService ledgerStateService =
+                new LedgerStateService(blockStore, new TransactionStore(), new CanonicalChainStore(), objectMapper);
 
         PeerStore peerStore = new PeerStore(List.of(peer, "localhost:8081"));
         PeerHttpClient peerHttpClient = new PeerHttpClient(objectMapper);
-        BlockPullSyncService blockPullSyncService = new BlockPullSyncService(peerStore, blockStore, peerHttpClient, "localhost:8081");
+        BlockPullSyncService blockPullSyncService =
+                new BlockPullSyncService(peerStore, ledgerStateService, peerHttpClient, "localhost:8081");
 
         blockPullSyncService.start();
         try {
@@ -77,10 +82,13 @@ class BlockPullSyncServiceTest {
 
         String peer = "localhost:" + server.getAddress().getPort();
         BlockStore blockStore = new BlockStore();
+        LedgerStateService ledgerStateService =
+                new LedgerStateService(blockStore, new TransactionStore(), new CanonicalChainStore(), objectMapper);
 
         PeerStore peerStore = new PeerStore(List.of(peer, "localhost:8081"));
         PeerHttpClient peerHttpClient = new PeerHttpClient(objectMapper);
-        BlockPullSyncService blockPullSyncService = new BlockPullSyncService(peerStore, blockStore, peerHttpClient, "localhost:8081");
+        BlockPullSyncService blockPullSyncService =
+                new BlockPullSyncService(peerStore, ledgerStateService, peerHttpClient, "localhost:8081");
 
         blockPullSyncService.start();
         try {

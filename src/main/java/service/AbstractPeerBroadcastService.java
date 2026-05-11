@@ -60,21 +60,21 @@ public abstract class AbstractPeerBroadcastService {
         this.fanOut = fanOut;
     }
 
-    public void submitBroadcast(String data) {
+    public void submitBroadcast(Object requestBody) {
         try {
-            broadcastExecutor.execute(() -> broadcast(data));
+            broadcastExecutor.execute(() -> broadcast(requestBody));
         } catch (RejectedExecutionException e) {
             log.warn("{} broadcast dropped because executor queue is full", entityName());
             log.debug("{} broadcast submission failed", entityName(), e);
         }
     }
 
-    public void broadcast(String data) {
+    public void broadcast(Object requestBody) {
         List<String> peers = selectPeers(peerStore.getAllPeers());
 
         for (String peer : peers) {
             try {
-                peerHttpClient.postJson(peer, path(), requestBody(data));
+                peerHttpClient.postJson(peer, path(), requestBody(requestBody));
                 logPeerRecovered(peer);
             } catch (Exception e) {
                 logPeerFailure(peer, e);
@@ -85,7 +85,7 @@ public abstract class AbstractPeerBroadcastService {
 
     protected abstract String path();
 
-    protected abstract Object requestBody(String data);
+    protected abstract Object requestBody(Object requestBody);
 
     protected abstract String entityName();
 

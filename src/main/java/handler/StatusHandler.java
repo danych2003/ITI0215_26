@@ -3,6 +3,7 @@ package handler;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import lombok.RequiredArgsConstructor;
+import service.LedgerStateService;
 import store.BlockStore;
 import store.PeerStore;
 import store.TransactionStore;
@@ -15,7 +16,7 @@ import java.util.Map;
 public class StatusHandler implements HttpHandler {
     private final String selfAddress;
     private final PeerStore peerStore;
-    private final BlockStore blockStore;
+    private final LedgerStateService ledgerStateService;
     private final TransactionStore transactionStore;
     private final ObjectMapper objectMapper;
 
@@ -28,7 +29,7 @@ public class StatusHandler implements HttpHandler {
         Map<String, Object> response = Map.of(
                 "selfAddress", selfAddress,
                 "peersCount", peerStore.size(),
-                "blocksCount", blockStore.size(),
+                "blocksCount", ledgerStateService.getCanonicalBlockCount(),
                 "transactionsCount", transactionStore.size()
         );
         HttpResponseWriter.writeJson(exchange, 200, objectMapper.writeValueAsBytes(response));

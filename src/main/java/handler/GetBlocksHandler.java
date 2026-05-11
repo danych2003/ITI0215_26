@@ -3,14 +3,14 @@ package handler;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import lombok.RequiredArgsConstructor;
-import store.BlockStore;
+import service.LedgerStateService;
 import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 
 @RequiredArgsConstructor
 public class GetBlocksHandler implements HttpHandler {
-    private final BlockStore blockStore;
+    private final LedgerStateService ledgerStateService;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -19,7 +19,7 @@ public class GetBlocksHandler implements HttpHandler {
             return;
         }
 
-        byte[] response = objectMapper.writeValueAsBytes(blockStore.getAllHashes());
+        byte[] response = objectMapper.writeValueAsBytes(ledgerStateService.getCanonicalHashes());
         HttpResponseWriter.writeJson(exchange, 200, response);
     }
 }

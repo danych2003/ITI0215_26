@@ -44,8 +44,16 @@ public class BlockBroadcastService extends AbstractPeerBroadcastService {
     }
 
     @Override
-    protected Object requestBody(String data) {
-        return new CreateBlockRequest(data);
+    protected Object requestBody(Object requestBody) {
+        if (requestBody instanceof CreateBlockRequest createBlockRequest) {
+            return createBlockRequest;
+        }
+
+        if (requestBody instanceof String data) {
+            return new CreateBlockRequest(data, null, null, null, null, null, null, null, null);
+        }
+
+        throw new IllegalArgumentException("Unsupported block broadcast body: " + requestBody);
     }
 
     @Override

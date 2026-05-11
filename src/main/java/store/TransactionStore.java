@@ -3,6 +3,7 @@ package store;
 import model.Transaction;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 
@@ -24,6 +25,16 @@ public class TransactionStore {
 
     public synchronized List<String> getAllHashes() {
         return new ArrayList<>(transactionsByHash.keySet());
+    }
+
+    public synchronized List<Transaction> getAllTransactions() {
+        return new ArrayList<>(transactionsByHash.values());
+    }
+
+    public synchronized void removeTransactions(Collection<String> transactionHashes) {
+        for (String transactionHash : transactionHashes) {
+            transactionsByHash.remove(transactionHash);
+        }
     }
 
     public synchronized int size() {

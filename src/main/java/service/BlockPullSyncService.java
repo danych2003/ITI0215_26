@@ -3,7 +3,6 @@ package service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import model.Block;
-import store.BlockStore;
 import store.PeerStore;
 import tools.jackson.databind.JsonNode;
 
@@ -21,7 +20,7 @@ public class BlockPullSyncService {
     private static final int SYNC_INTERVAL_SECONDS = 10;
 
     private final PeerStore peerStore;
-    private final BlockStore blockStore;
+    private final LedgerStateService ledgerStateService;
     private final PeerHttpClient peerHttpClient;
     private final String selfAddress;
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
@@ -70,7 +69,7 @@ public class BlockPullSyncService {
             }
 
             String hash = hashNode.asText();
-            if (blockStore.getBlock(hash) != null) {
+            if (ledgerStateService.getKnownBlock(hash) != null) {
                 continue;
             }
 
@@ -88,7 +87,7 @@ public class BlockPullSyncService {
                 continue;
             }
 
-            if (blockStore.addBlock(block)) {
+            if (ledgerStateService.addKnownBlock(block)) {
                 added++;
             }
         }

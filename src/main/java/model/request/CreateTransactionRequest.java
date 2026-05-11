@@ -1,3 +1,10 @@
 package model.request;
 
-public record CreateTransactionRequest(String data) {}
+import model.TransactionPayload;
+
+public record CreateTransactionRequest(
+        String data,
+        String signature,
+        TransactionPayload transaction
+) {
+}

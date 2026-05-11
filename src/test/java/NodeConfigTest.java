@@ -1,6 +1,8 @@
 import config.NodeConfig;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -14,6 +16,9 @@ class NodeConfigTest {
         assertEquals("peers.json", config.peersConfigPath());
         assertEquals(true, config.backgroundServicesEnabled());
         assertEquals(0, config.broadcastFanOut());
+        assertEquals(0, config.miningDifficulty());
+        assertEquals(2_000L, config.miningIntervalMillis());
+        assertEquals(new BigDecimal("1"), config.miningReward());
         assertEquals("localhost:8081", config.selfAddress());
     }
 
@@ -45,6 +50,17 @@ class NodeConfigTest {
         NodeConfig config = NodeConfig.fromArgs(new String[]{"8081", "localhost", "peers.json", "false", "5"});
 
         assertEquals(5, config.broadcastFanOut());
+    }
+
+    @Test
+    void acceptsMiningSettings() {
+        NodeConfig config = NodeConfig.fromArgs(
+                new String[]{"8081", "localhost", "peers.json", "false", "5", "2", "1500", "2.50"}
+        );
+
+        assertEquals(2, config.miningDifficulty());
+        assertEquals(1_500L, config.miningIntervalMillis());
+        assertEquals(new BigDecimal("2.50"), config.miningReward());
     }
 
     @Test
@@ -105,5 +121,15 @@ class NodeConfigTest {
         );
 
         assertEquals("Broadcast fan-out must be a number", exception.getMessage());
+    }
+
+    @Test
+    void rejectsInvalidMiningDifficulty() {
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> NodeConfig.fromArgs(new String[]{"8081", "localhost", "peers.json", "false", "5", "oops"})
+        );
+
+        assertEquals("Mining difficulty must be a number", exception.getMessage());
     }
 }

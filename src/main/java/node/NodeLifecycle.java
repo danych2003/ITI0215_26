@@ -2,6 +2,7 @@ package node;
 
 import lombok.RequiredArgsConstructor;
 import service.BlockPullSyncService;
+import service.BlockMiningService;
 import service.PeerDiscoveryService;
 import service.TransactionPullSyncService;
 import store.PeerStore;
@@ -16,6 +17,7 @@ public final class NodeLifecycle {
     private final PeerDiscoveryService peerDiscoveryService;
     private final BlockPullSyncService blockPullSyncService;
     private final TransactionPullSyncService transactionPullSyncService;
+    private final BlockMiningService blockMiningService;
     private final ExecutorService broadcastExecutor;
     private final boolean backgroundServicesEnabled;
 
@@ -24,11 +26,13 @@ public final class NodeLifecycle {
             peerDiscoveryService.startDiscovery(peerStore, selfAddress);
             blockPullSyncService.start();
             transactionPullSyncService.start();
+            blockMiningService.start();
         }
     }
 
     public void shutdown() {
         if (backgroundServicesEnabled) {
+            blockMiningService.shutdown();
             transactionPullSyncService.shutdown();
             blockPullSyncService.shutdown();
             peerDiscoveryService.shutdown();

@@ -59,6 +59,8 @@ Bootstrap peers are configured in [peers.json](/C:/Users/Acer0/IdeaProjects/peer
 
 Persisted blocks are stored per node under `data/node-<port>/blocks.json`.
 
+Persisted node key pairs are stored under `data/node-<port>/keys.json`.
+
 ## Network Topology
 
 Current default topology is a local 3-node setup:
@@ -197,6 +199,15 @@ Possible error responses:
 - `405` if method is not `POST`
 - `409` if block already exists
 
+Structured ledger blocks are also supported. The node validates:
+
+- `height` and `previousHash`
+- transaction signatures
+- reward transaction rules
+- Merkle root
+- mining difficulty
+- canonical chain rules
+
 ### `POST /inv`
 
 Accepts a new transaction and broadcasts it to peers if it was not seen before.
@@ -223,6 +234,14 @@ Possible error responses:
 - `400` if `data` is missing
 - `405` if method is not `POST`
 - `409` if transaction already exists
+
+Structured signed transactions are also supported. The node validates:
+
+- required transaction fields
+- signature correctness
+- duplicate detection
+- available balance on the canonical chain
+- overspending against already pending outgoing transactions
 
 ## Manual Test Scenario
 
@@ -310,12 +329,39 @@ Use:
 
 The simulation writes reports to `build/simulation/reports/` and per-node logs to `build/simulation/logs/`.
 
+You can also run a single scenario:
+
+```powershell
+.\gradlew.bat runSimulation --args="divergence"
+.\gradlew.bat runSimulation --args="convergence"
+.\gradlew.bat runSimulation --args="partition-failure"
+.\gradlew.bat runSimulation --args="propagation"
+.\gradlew.bat runSimulation --args="recovery"
+.\gradlew.bat runSimulation --args="scale"
+```
+
 Latest verified local run:
 
+- divergence without consensus scenario: `PASS` on `3` nodes
+- convergence with consensus scenario: `PASS` on `3` nodes
+- consensus failure under permanent partition scenario: `PASS` on `4` nodes
 - propagation scenario: `PASS` on `3` nodes
 - failure recovery scenario: `PASS` on `3` nodes
 - scale scenario: `PASS` on `5`, `10`, and `20` nodes
 - scale scenario: `FAIL` on `30` nodes with `Address already in use: getsockopt`
+
+Latest full-suite report:
+
+- [network-simulation-report-20260509-181056.md](/C:/Users/Acer0/IdeaProjects/peer-ledger/build/simulation/reports/network-simulation-report-20260509-181056.md)
+
+Consensus-focused scenarios now cover:
+
+- divergence without consensus:
+  same data eventually reaches nodes, but different arrival order keeps block and transaction order inconsistent
+- convergence with consensus:
+  isolated competing branches are later merged through block sync and deterministic fork choice
+- failure/degradation with consensus:
+  under permanent network partition, each side converges internally but there is no global canonical chain agreement
 
 Observed current local limit on this machine:
 
