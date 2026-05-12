@@ -352,7 +352,7 @@ Latest verified local run:
 
 Latest full-suite report:
 
-- [network-simulation-report-20260509-181056.md](/C:/Users/Acer0/IdeaProjects/peer-ledger/build/simulation/reports/network-simulation-report-20260509-181056.md)
+- [network-simulation-report-20260509-181056.md](./report.md)
 
 Consensus-focused scenarios now cover:
 
