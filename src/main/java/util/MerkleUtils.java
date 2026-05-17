@@ -1,8 +1,12 @@
 package util;
 
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
+
 import java.util.ArrayList;
 import java.util.List;
 
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class MerkleUtils {
     public static String merkleRoot(List<String> leaves) {
         if (leaves == null || leaves.isEmpty()) {
@@ -21,8 +25,5 @@ public final class MerkleUtils {
         }
 
         return currentLevel.get(0);
-    }
-
-    private MerkleUtils() {
     }
 }

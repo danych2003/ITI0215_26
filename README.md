@@ -1,8 +1,16 @@
 # peer-ledger
 
-Simple peer-to-peer ledger prototype over the built-in Java HTTP server.
+Peer-to-peer ledger prototype on top of Java's built-in HTTP server.
 
-The project runs multiple console nodes on different ports. Nodes discover peers, exchange known block hashes, return block data, accept new blocks and transactions, and broadcast them to other peers.
+Each node can:
+
+- discover peers via `/addr`
+- exchange block and transaction inventories
+- pull missing data from peers
+- keep a canonical chain separate from the full known block set
+- validate structured signed transactions and structured ledger blocks
+- mine new structured blocks from pending structured transactions
+- persist blocks and node key pairs on disk
 
 ## Stack
 
@@ -10,44 +18,35 @@ The project runs multiple console nodes on different ports. Nodes discover peers
 - Gradle
 - `com.sun.net.httpserver.HttpServer`
 - Jackson
-- SLF4J + Lombok
+- SLF4J
+- Lombok
+- JUnit 5
 
-## How To Run
+## Project Entry Points
 
-From the project root:
+Main node process:
 
 ```powershell
 .\gradlew.bat runNode8081
-```
-
-or:
-
-```powershell
 .\gradlew.bat runNode8082
-```
-
-or:
-
-```powershell
 .\gradlew.bat runNode8083
 ```
 
-To start all three local nodes at once, see [RUN_NODES.md](/C:/Users/Acer0/IdeaProjects/peer-ledger/RUN_NODES.md).
-
-To run a node with an explicit host or LAN IP:
+Network simulation:
 
 ```powershell
-.\gradlew.bat classes
-java -cp build\classes\java\main;build\resources\main;build\libs\* NodeApp 8081 192.168.0.15 C:\path\to\peers.json
+.\gradlew.bat runSimulation
 ```
 
-Arguments:
+Tests:
 
-- `8081` - local listening port
-- `192.168.0.15` - host/IP to bind and advertise to peers
-- `C:\path\to\peers.json` - peer bootstrap file for this machine or network
+```powershell
+.\gradlew.bat test
+```
 
-Bootstrap peers are configured in [peers.json](/C:/Users/Acer0/IdeaProjects/peer-ledger/src/main/resources/peers.json):
+## Node Startup
+
+Default local bootstrap peers are defined in [src/main/resources/peers.json](/C:/Users/Acer0/IdeaProjects/peer-ledger/src/main/resources/peers.json):
 
 ```json
 [
@@ -57,32 +56,46 @@ Bootstrap peers are configured in [peers.json](/C:/Users/Acer0/IdeaProjects/peer
 ]
 ```
 
-Persisted blocks are stored per node under `data/node-<port>/blocks.json`.
+To start one local node:
 
-Persisted node key pairs are stored under `data/node-<port>/keys.json`.
+```powershell
+.\gradlew.bat runNode8081
+```
 
-## Network Topology
+To open three separate PowerShell windows, see [RUN_NODES.md](/C:/Users/Acer0/IdeaProjects/peer-ledger/RUN_NODES.md).
 
-Current default topology is a local 3-node setup:
+`NodeApp` also supports explicit CLI arguments when launched manually from the IDE or another Java entrypoint:
 
-- `localhost:8081`
-- `localhost:8082`
-- `localhost:8083`
+1. `port` - required
+2. `host` - default `localhost`
+3. `peersConfigPath` - default `peers.json`
+4. `backgroundServicesEnabled` - default `true`
+5. `broadcastFanOut` - default `0` (`0` means broadcast to all known peers)
+6. `miningDifficulty` - default `0`
+7. `miningIntervalMillis` - default `2000`
+8. `miningReward` - default `1.0`
 
-Each node:
+When background services are enabled, a node automatically runs:
 
-- listens for incoming HTTP requests
-- periodically asks known peers for `/addr`
-- stores discovered peers in memory
-- broadcasts new blocks and transactions to other known peers
+- peer discovery
+- block pull sync
+- transaction pull sync
+- periodic mining of structured transactions
 
-## Protocol
+## Persistence
+
+Per-node files are stored under `data/node-<port>/`:
+
+- `blocks.json` - all known blocks
+- `keys.json` - generated node key pair
+
+Transactions and known peers are kept in memory. After a canonical-chain rebuild, transactions already included in the canonical chain are removed from the pending transaction store.
+
+## HTTP API
 
 ### `GET /status`
 
-Returns the current node state.
-
-Response:
+Returns the current node snapshot:
 
 ```json
 {
@@ -93,182 +106,37 @@ Response:
 }
 ```
 
+`blocksCount` is the canonical chain size, not the total number of known blocks.
+
 ### `GET /addr`
 
-Returns all currently known peers.
-
-Response:
-
-```json
-[
-  "localhost:8081",
-  "localhost:8082",
-  "localhost:8083"
-]
-```
+Returns known peers.
 
 ### `GET /getblocks`
 
-Returns all known block hashes.
-
-Response:
-
-```json
-[
-  "hash1",
-  "hash2"
-]
-```
+Returns canonical-chain block hashes in order.
 
 ### `GET /getblocks/{hash}`
 
-Returns block hashes that come after the given hash.
-
-Response:
-
-```json
-[
-  "nextHash1",
-  "nextHash2"
-]
-```
+Returns canonical-chain hashes after the specified hash.
 
 ### `GET /getdata/{hash}`
 
-Returns block data for a specific block hash.
-
-Response:
-
-```json
-{
-  "hash": "blockHash",
-  "data": "block payload"
-}
-```
+Returns raw stored block data for a specific hash.
 
 ### `GET /transactions`
 
-Returns all known transaction hashes.
-
-Response:
-
-```json
-[
-  "txHash1",
-  "txHash2"
-]
-```
+Returns hashes of pending transactions currently known to the node.
 
 ### `GET /transactions/{hash}`
 
-Returns a specific transaction.
-
-Response:
-
-```json
-{
-  "hash": "txHash",
-  "data": "transaction payload"
-}
-```
-
-### `POST /block`
-
-Accepts a new block and broadcasts it to peers if it was not seen before.
-
-Request body:
-
-```json
-{
-  "data": "block payload"
-}
-```
-
-Success response:
-
-```json
-{
-  "accepted": true,
-  "hash": "newBlockHash"
-}
-```
-
-Possible error responses:
-
-- `400` if `data` is missing
-- `405` if method is not `POST`
-- `409` if block already exists
-
-Structured ledger blocks are also supported. The node validates:
-
-- `height` and `previousHash`
-- transaction signatures
-- reward transaction rules
-- Merkle root
-- mining difficulty
-- canonical chain rules
+Returns the stored transaction payload for a specific hash.
 
 ### `POST /inv`
 
-Accepts a new transaction and broadcasts it to peers if it was not seen before.
+Accepts either a legacy plain transaction or a structured signed transaction.
 
-Request body:
-
-```json
-{
-  "data": "transaction payload"
-}
-```
-
-Success response:
-
-```json
-{
-  "accepted": true,
-  "hash": "newTransactionHash"
-}
-```
-
-Possible error responses:
-
-- `400` if `data` is missing
-- `405` if method is not `POST`
-- `409` if transaction already exists
-
-Structured signed transactions are also supported. The node validates:
-
-- required transaction fields
-- signature correctness
-- duplicate detection
-- available balance on the canonical chain
-- overspending against already pending outgoing transactions
-
-## Manual Test Scenario
-
-### 1. Start three nodes
-
-- `localhost:8081`
-- `localhost:8082`
-- `localhost:8083`
-
-### 2. Check discovery
-
-- `GET http://localhost:8081/status`
-- `GET http://localhost:8082/status`
-- `GET http://localhost:8083/status`
-- `GET http://localhost:8081/addr`
-- `GET http://localhost:8082/addr`
-- `GET http://localhost:8083/addr`
-
-Expected result: each node returns its own status and the known local peers.
-
-### 3. Send a transaction
-
-URL:
-
-- `POST http://localhost:8081/inv`
-
-Body:
+Legacy format:
 
 ```json
 {
@@ -276,18 +144,33 @@ Body:
 }
 ```
 
-Check propagation:
+Structured format:
 
-- `GET http://localhost:8082/transactions`
-- `GET http://localhost:8083/transactions`
+```json
+{
+  "signature": "base64-signature",
+  "transaction": {
+    "from": "base64-public-key",
+    "to": "base64-public-key",
+    "amount": 5.0,
+    "timestamp": "2026-05-17T20:00:00Z"
+  }
+}
+```
 
-### 4. Send a block
+Structured validation covers:
 
-URL:
+- required fields
+- signature correctness
+- duplicate detection
+- available balance on the canonical chain
+- overspending against pending outgoing transactions
 
-- `POST http://localhost:8081/block`
+### `POST /block`
 
-Body:
+Accepts either a legacy plain block or a structured ledger block.
+
+Legacy format:
 
 ```json
 {
@@ -295,75 +178,84 @@ Body:
 }
 ```
 
-Check propagation:
+Structured format:
 
-- `GET http://localhost:8082/getblocks`
-- `GET http://localhost:8083/getblocks`
-
-### 5. Read block data
-
-Use the returned block hash:
-
-- `GET http://localhost:8082/getdata/{blockHash}`
-
-## Experiment Notes
-
-Current verified scenario is a local multi-process setup on one machine:
-
-- three nodes on different ports
-- peer discovery through `/addr`
-- block propagation through `/block`
-- transaction propagation through `/inv`
-
-Peers and transactions are stored in memory. Blocks are persisted on disk per node and reloaded on restart.
-
-The node no longer assumes `localhost` internally: a node can be started with a real host/IP so the same protocol can be exercised across multiple machines, as long as peers use reachable addresses in `peers.json`.
-
-### Simulation Results
-
-Use:
-
-```powershell
-.\gradlew.bat runSimulation
+```json
+{
+  "height": 2,
+  "previousHash": "previous-block-hash",
+  "timestamp": "2026-05-17T20:00:00Z",
+  "nonce": "1a2b",
+  "hash": "computed-block-hash",
+  "creator": "base64-public-key",
+  "merkleRoot": "computed-merkle-root",
+  "transactions": [
+    {
+      "hash": "transaction-hash",
+      "signature": "base64-signature",
+      "transaction": {
+        "from": "base64-public-key",
+        "to": "base64-public-key",
+        "amount": 5.0,
+        "timestamp": "2026-05-17T20:00:00Z"
+      }
+    }
+  ]
+}
 ```
 
-The simulation writes reports to `build/simulation/reports/` and per-node logs to `build/simulation/logs/`.
+Structured block validation covers:
 
-You can also run a single scenario:
+- block hash consistency
+- `height` / `previousHash`
+- transaction signatures
+- reward transaction rules
+- Merkle root
+- mining difficulty
+- canonical fork-choice rules
+
+Successful `POST /inv` and `POST /block` responses:
+
+```json
+{
+  "accepted": true,
+  "hash": "created-or-received-hash"
+}
+```
+
+Typical error responses:
+
+- `400` invalid or missing payload
+- `405` wrong HTTP method
+- `409` duplicate transaction or block
+
+## Simulation
+
+The simulation runner starts isolated node processes, executes network scenarios, and writes:
+
+- logs to `build/simulation/logs/`
+- markdown reports to `build/simulation/reports/`
+
+Supported scenarios:
+
+- `divergence`
+- `convergence`
+- `partition-failure`
+- `propagation`
+- `recovery`
+- `scale`
+
+Examples:
 
 ```powershell
 .\gradlew.bat runSimulation --args="divergence"
-.\gradlew.bat runSimulation --args="convergence"
-.\gradlew.bat runSimulation --args="partition-failure"
-.\gradlew.bat runSimulation --args="propagation"
-.\gradlew.bat runSimulation --args="recovery"
 .\gradlew.bat runSimulation --args="scale"
 ```
 
-Latest verified local run:
+Latest local verification run on May 17, 2026:
 
-- divergence without consensus scenario: `PASS` on `3` nodes
-- convergence with consensus scenario: `PASS` on `3` nodes
-- consensus failure under permanent partition scenario: `PASS` on `4` nodes
-- propagation scenario: `PASS` on `3` nodes
-- failure recovery scenario: `PASS` on `3` nodes
-- scale scenario: `PASS` on `5`, `10`, and `20` nodes
-- scale scenario: `FAIL` on `30` nodes with `Address already in use: getsockopt`
+- `.\gradlew.bat test` -> `BUILD SUCCESSFUL`
+- `.\gradlew.bat runSimulation` -> all scenarios `PASS`
+- full report: [network-simulation-report-20260517-203404.md](/C:/Users/Acer0/IdeaProjects/peer-ledger/build/simulation/reports/network-simulation-report-20260517-203404.md)
 
-Latest full-suite report:
-
-- [network-simulation-report-20260509-181056.md](./report.md)
-
-Consensus-focused scenarios now cover:
-
-- divergence without consensus:
-  same data eventually reaches nodes, but different arrival order keeps block and transaction order inconsistent
-- convergence with consensus:
-  isolated competing branches are later merged through block sync and deterministic fork choice
-- failure/degradation with consensus:
-  under permanent network partition, each side converges internally but there is no global canonical chain agreement
-
-Observed current local limit on this machine:
-
-- the implementation remains stable up to `20` concurrently simulated nodes in the built-in scale run
-- at `30` nodes, the local machine runs into socket/resource exhaustion during the simulation run and at least one node fails to become reachable
+In the latest run, the scale scenario passed on `5`, `10`, `20`, and `30` nodes.
