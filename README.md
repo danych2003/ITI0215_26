@@ -46,7 +46,7 @@ Tests:
 
 ## Node Startup
 
-Default local bootstrap peers are defined in [src/main/resources/peers.json](/C:/Users/Acer0/IdeaProjects/peer-ledger/src/main/resources/peers.json):
+Default local bootstrap peers are defined in [src/main/resources/peers.json](src/main/resources/peers.json):
 
 ```json
 [
@@ -62,7 +62,7 @@ To start one local node:
 .\gradlew.bat runNode8081
 ```
 
-To open three separate PowerShell windows, see [RUN_NODES.md](/C:/Users/Acer0/IdeaProjects/peer-ledger/RUN_NODES.md).
+To open three separate PowerShell windows, see [RUN_NODES.md](RUN_NODES.md).
 
 `NodeApp` also supports explicit CLI arguments when launched manually from the IDE or another Java entrypoint:
 
@@ -256,6 +256,6 @@ Latest local verification run on May 17, 2026:
 
 - `.\gradlew.bat test` -> `BUILD SUCCESSFUL`
 - `.\gradlew.bat runSimulation` -> all scenarios `PASS`
-- full report: [network-simulation-report-20260517-203404.md](/C:/Users/Acer0/IdeaProjects/peer-ledger/build/simulation/reports/network-simulation-report-20260517-203404.md)
+- full report: [network-simulation-report-20260517-203404.md](build/simulation/reports/network-simulation-report-20260517-203404.md)
 
 In the latest run, the scale scenario passed on `5`, `10`, `20`, and `30` nodes.
