@@ -243,12 +243,14 @@ Supported scenarios:
 - `partition-failure`
 - `propagation`
 - `recovery`
+- `partial-divergence`
 - `scale`
 
 Examples:
 
 ```powershell
 .\gradlew.bat runSimulation --args="divergence"
+.\gradlew.bat runSimulation --args="partial-divergence"
 .\gradlew.bat runSimulation --args="scale"
 ```
 
