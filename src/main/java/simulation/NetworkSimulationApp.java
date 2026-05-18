@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import model.LedgerBlock;
 import model.NodeStatus;
 import model.SignedTransaction;
+import model.Transaction;
 import model.TransactionPayload;
 import model.request.CreateBlockRequest;
 import tools.jackson.databind.ObjectMapper;
@@ -23,6 +24,10 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Stream;
@@ -73,6 +78,8 @@ public final class NetworkSimulationApp {
             cooldownBetweenScenarios();
             results.add(runFailureRecoveryScenario());
             cooldownBetweenScenarios();
+            results.add(runPartialLedgerDivergenceScenario());
+            cooldownBetweenScenarios();
             results.add(runScaleSeriesScenario());
             return results;
         }
@@ -83,6 +90,7 @@ public final class NetworkSimulationApp {
             case "partition-failure" -> List.of(runConsensusFailureUnderPartitionScenario());
             case "propagation" -> List.of(runPropagationScenario());
             case "recovery" -> List.of(runFailureRecoveryScenario());
+            case "partial-divergence" -> List.of(runPartialLedgerDivergenceScenario());
             case "scale" -> List.of(runScaleSeriesScenario());
             default -> throw new IllegalArgumentException("Unknown simulation scenario: " + args[0]);
         };
@@ -423,6 +431,71 @@ public final class NetworkSimulationApp {
         }
     }
 
+    private SimulationScenarioResult runPartialLedgerDivergenceScenario() throws Exception {
+        String scenarioName = "Partial Ledger Divergence Scenario";
+        String scenarioKey = "partial-ledger-divergence";
+        List<Integer> ports = reservePorts(3);
+        List<ManagedNode> nodes = createIsolatedCluster(ports, scenarioKey, true);
+        List<String> details = new ArrayList<>();
+        long startedAt = System.nanoTime();
+
+        String tx1 = "tx-partial-divergence-1";
+        String tx2 = "tx-partial-divergence-2";
+        String tx3 = "tx-partial-divergence-3";
+
+        List<String> expectedNode1 = List.of(Transaction.fromData(tx1).getHash(), Transaction.fromData(tx3).getHash());
+        List<String> expectedNode2 = List.of(Transaction.fromData(tx1).getHash(), Transaction.fromData(tx2).getHash());
+        List<String> expectedNode3 = List.of(Transaction.fromData(tx2).getHash(), Transaction.fromData(tx3).getHash());
+
+        try {
+            startCluster(nodes);
+            waitForNodeStartup(nodes);
+
+            details.add("Background services disabled for all nodes");
+            details.add("Peer configs are isolated to disable relay and keep delivery deterministic");
+            details.add("Selective delivery reproduces S1(T1,T3), S2(T1,T2), S3(T2,T3)");
+
+            submitTransactionsConcurrently(List.of(
+                    new TransactionSubmission(nodes.get(0).address(), tx1),
+                    new TransactionSubmission(nodes.get(1).address(), tx1),
+                    new TransactionSubmission(nodes.get(1).address(), tx2),
+                    new TransactionSubmission(nodes.get(2).address(), tx2),
+                    new TransactionSubmission(nodes.get(2).address(), tx3),
+                    new TransactionSubmission(nodes.get(0).address(), tx3)
+            ));
+
+            awaitCondition(
+                    "each node keeps the expected pair of transaction hashes",
+                    () -> nodeHasTransactionHashSet(nodes.get(0), expectedNode1)
+                            && nodeHasTransactionHashSet(nodes.get(1), expectedNode2)
+                            && nodeHasTransactionHashSet(nodes.get(2), expectedNode3),
+                    PROPAGATION_TIMEOUT
+            );
+
+            boolean transactionsAgree = allNodesHaveSameTransactionHashes(nodes);
+
+            details.add("Expected transaction sets:");
+            details.add(nodes.get(0).address() + " -> " + expectedNode1);
+            details.add(nodes.get(1).address() + " -> " + expectedNode2);
+            details.add(nodes.get(2).address() + " -> " + expectedNode3);
+            details.add("Transaction pool agreement: " + (transactionsAgree ? "YES" : "NO"));
+            appendHashes(details, nodes);
+            appendStatuses(details, nodes);
+
+            boolean success = !transactionsAgree;
+            if (!success) {
+                details.add("Failure: all nodes converged to the same transaction set");
+            }
+            return scenarioResult(scenarioName, success, nodes.size(), startedAt, details);
+        } catch (Exception e) {
+            details.add("Failure: " + e.getMessage());
+            appendStatusesQuietly(details, nodes);
+            return scenarioResult(scenarioName, false, nodes.size(), startedAt, details);
+        } finally {
+            stopCluster(nodes);
+        }
+    }
+
     private SimulationScenarioResult runScaleSeriesScenario() throws Exception {
         String scenarioName = "Scale Series Scenario";
         List<String> details = new ArrayList<>();
@@ -725,6 +798,38 @@ public final class NetworkSimulationApp {
         return true;
     }
 
+    private boolean nodeHasTransactionHashSet(ManagedNode node, List<String> expectedHashes) throws IOException {
+        List<String> actualHashes = httpClient.getTransactionHashes(node.address());
+        return actualHashes.size() == expectedHashes.size() && actualHashes.containsAll(expectedHashes);
+    }
+
+    private void submitTransactionsConcurrently(List<TransactionSubmission> submissions) throws Exception {
+        ExecutorService executor = Executors.newFixedThreadPool(submissions.size());
+        try {
+            List<Future<?>> futures = new ArrayList<>();
+            for (TransactionSubmission submission : submissions) {
+                futures.add(executor.submit(() -> {
+                    httpClient.postTransaction(submission.address(), submission.data());
+                    return null;
+                }));
+            }
+
+            for (Future<?> future : futures) {
+                try {
+                    future.get();
+                } catch (ExecutionException e) {
+                    Throwable cause = e.getCause();
+                    if (cause instanceof Exception exception) {
+                        throw exception;
+                    }
+                    throw new IllegalStateException("Concurrent transaction submission failed", cause);
+                }
+            }
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
     private Path writeReport(List<SimulationScenarioResult> results) throws IOException {
         String timestamp = FILE_TIMESTAMP.format(LocalDateTime.now());
         Path reportFile = reportsDirectory.resolve("network-simulation-report-" + timestamp + ".md").toAbsolutePath();
@@ -815,6 +920,9 @@ public final class NetworkSimulationApp {
 
     private List<String> addressesForPorts(List<Integer> ports) {
         return ports.stream().map(port -> HOST + ":" + port).toList();
+    }
+
+    private record TransactionSubmission(String address, String data) {
     }
 
     private String toBlockRequestJson(LedgerBlock block) throws IOException {
